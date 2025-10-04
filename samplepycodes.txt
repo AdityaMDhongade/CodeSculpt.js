@@ -1,0 +1,202 @@
+// 1. Binary Search
+function binarySearch(arr, target) {
+  let left = 0, right = arr.length - 1;
+  while (left <= right) {
+    let mid = Math.floor((left + right) / 2);
+    if (arr[mid] === target) return mid;
+    if (arr[mid] < target) left = mid + 1;
+    else right = mid - 1;
+  }
+  return -1;
+}
+console.log(binarySearch([1, 3, 5, 7, 9], 7)); // Output: 3
+
+
+
+function bubbleSortStatic() {
+  let arr = [5, 3, 8, 4, 2]; // Static input inside the function
+  let n = arr.length;
+
+  for (let i = 0; i < n - 1; i++) {
+    for (let j = 0; j < n - 1 - i; j++) {
+      if (arr[j] > arr[j + 1]) {
+        // Swap elements
+        let temp = arr[j];
+        arr[j] = arr[j + 1];
+        arr[j + 1] = temp;
+      }
+    }
+  }
+
+  return arr;
+}
+
+console.log(bubbleSortStatic());  // Output: [2, 3, 4, 5, 8]
+
+
+function bubbleSortWithWhile() {
+  let arr = [5, 3, 8, 4, 2]; // Static input
+  let n = arr.length;
+  let i = 0;
+
+  while (i < n - 1) {
+    let j = 0;
+    while (j < n - 1 - i) {
+      if (arr[j] > arr[j + 1]) {
+        // Swap elements
+        let temp = arr[j];
+        arr[j] = arr[j + 1];
+        arr[j + 1] = temp;
+      }
+      j++;
+    }
+    i++;
+  }
+
+  return arr;
+}
+
+console.log(bubbleSortWithWhile());
+
+// selectionSort.js
+function selectionSort(arr) {
+  const n = arr.length;
+  for (let i = 0; i < n - 1; i++) {
+    let minIndex = i;
+    for (let j = i + 1; j < n; j++) {
+      if (arr[j] < arr[minIndex]) {
+        minIndex = j;
+      }
+    }
+    // Swap elements
+    const temp = arr[i];
+    arr[i] = arr[minIndex];
+    arr[minIndex] = temp;
+  }
+  return arr;
+}
+
+console.log(selectionSort([64, 25, 12, 22, 11]));
+
+// factorial.js
+function factorial(n) {
+  if (n <= 1) {
+    return 1;
+  } else {
+    return n * factorial(n - 1);
+  }
+}
+
+console.log(factorial(4)); // Output: 24
+
+// modern.js
+const processData = (data) => {
+  if (!data || data.length === 0) {
+    return { first: null, max: -Infinity };
+  }
+
+  const [first] = data;
+  let max = first;
+
+  for (const value of data) {
+    if (value > max) {
+      max = value;
+    }
+  }
+  return { first, max };
+};
+
+console.log(processData([10, 50, 30])); // { first: 10, max: 50 }
+
+// linkedList.js
+class Node {
+  constructor(data) {
+    this.data = data;
+    this.next = null;
+  }
+}
+
+class LinkedList {
+  constructor() {
+    this.head = null;
+  }
+
+  append(data) {
+    const newNode = new Node(data);
+    if (!this.head) {
+      this.head = newNode;
+      return;
+    }
+    let current = this.head;
+    while (current.next) {
+      current = current.next;
+    }
+    current.next = newNode;
+  }
+}
+
+const list = new LinkedList();
+list.append(10);
+list.append(20);
+console.log(JSON.stringify(list.head)); // {"data":10,"next":{"data":20,"next":null}}
+
+
+.............................................................................................
+// Static input
+const inputString = "madm";
+
+// Function to reverse a string
+function reverseString(str) {
+  return str.split('').reverse().join('');
+}
+
+// Function to check if a string is a palindrome
+function isPalindrome(str) {
+  const reversed = reverseString(str);
+  return str === reversed;
+}
+
+// Output
+const reversed = reverseString(inputString);
+const palindromeCheck = isPalindrome(inputString);
+
+console.log("Original String:", inputString);
+console.log("Reversed String:", reversed);
+console.log("Is Palindrome:", palindromeCheck);
+
+..........................................................................
+
+
+// Static sorted array and target value
+const arr = [1, 3, 5, 7, 9, 11, 13, 15];
+const target = 5;
+
+// Recursive binary search function
+function binarySearchRecursive(array, target, left, right) {
+  if (left > right) {
+    return -1; // Target not found
+  }
+
+  const mid = Math.floor((left + right) / 2);
+
+  if (array[mid] === target) {
+    return mid; // Target found
+  } else if (array[mid] > target) {
+    return binarySearchRecursive(array, target, left, mid - 1);
+  } else {
+    return binarySearchRecursive(array, target, mid + 1, right);
+  }
+}
+
+// Call the function
+const result = binarySearchRecursive(arr, target, 0, arr.length - 1);
+
+// Output
+if (result !== -1) {
+  console.log(`Target ${target} found at index ${result}`);
+} else {
+  console.log(`Target ${target} not found in the array`);
+}
+
+
+............................................................

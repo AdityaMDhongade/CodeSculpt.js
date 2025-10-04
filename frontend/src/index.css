@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Highlight current executing line in Monaco */
+.exec-line {
+  background-color: rgba(255, 213, 0, 0.28) !important;
+  border-left: 3px solid rgba(234, 179, 8, 0.9);
+}
+
+/* Optional: nicer scrollbars (Chrome/Edge) */
+*::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.2);
+  border-radius: 999px;
+}

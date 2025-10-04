@@ -1,0 +1,75 @@
+# Node modules (both backend and frontend)
+node_modules/
+**/node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# dotenv environment variables
+.env
+.env.*.local
+.env.local
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Build directories
+build/
+dist/
+client/build/
+client/dist/
+
+# Dependency directories
+jspm_packages/
+
+# IDE/editor files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Testing coverage
+coverage/
+.nyc_output/
+
+# Next.js (if used in client)
+.next/
+out/
+
+# Optional npm cache files
+.npm
+
+# React Native
+.expo/
+.expo-shared/
+
+# Misc
+*.tgz
+.pnp/
+.pnp.js
+
+# ESLint cache
+.eslintcache
+
+# Parcel-bundler cache (if used)
+.cache/
+.parcel-cache/
+
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+
+# MongoDB dump files
+dump/
+
+# TypeScript cache
+*.tsbuildinfo

@@ -1,0 +1,346 @@
+// babel-tracer.js
+const t = require("@babel/types");
+const generate = require("@babel/generator").default;
+
+// --- Helpers ---
+function getLine(node) {
+  return node && node.loc ? node.loc.start.line : -1;
+}
+
+function makeLog(path, type, extraProps = []) {
+  const line = getLine(path.node);
+  return t.expressionStatement(
+    t.callExpression(t.identifier("__log"), [
+      t.objectExpression([
+        t.objectProperty(t.identifier("action"), t.stringLiteral(type)),
+        t.objectProperty(t.identifier("line"), t.numericLiteral(line)),
+        ...extraProps,
+      ]),
+    ])
+  );
+}
+
+// --- Reusable Function Instrumenter ---
+function instrumentFunction(path) {
+  if (path.node.body.instrumented) return; // Prevent double instrumentation
+
+  let fnName = "anonymous";
+  if (path.node.id) {
+    fnName = path.node.id.name;
+  } else if (t.isVariableDeclarator(path.parent) && t.isIdentifier(path.parent.id)) {
+    fnName = path.parent.id.name;
+  }
+
+  const params = path.get("params").map(p => {
+    const paramName = t.isIdentifier(p.node) ? p.node.name : "destructured";
+    return t.objectProperty(
+      t.identifier(paramName),
+      t.identifier(paramName)
+    );
+  });
+
+  // Ensure body is a block statement
+  if (!t.isBlockStatement(path.node.body)) {
+    path.node.body = t.blockStatement([t.returnStatement(path.node.body)]);
+  }
+
+  path.get("body").unshiftContainer(
+    "body",
+    makeLog(path, "call", [
+      t.objectProperty(t.identifier("function"), t.stringLiteral(fnName)),
+      t.objectProperty(t.identifier("args"), t.objectExpression(params)),
+    ])
+  );
+
+  path.get("body").pushContainer(
+    "body",
+    makeLog(path, "return", [
+      t.objectProperty(t.identifier("function"), t.stringLiteral(fnName)),
+    ])
+  );
+
+  path.node.body.instrumented = true; // Mark as instrumented
+}
+
+
+// --- Plugin ---
+module.exports = function tracerPlugin() {
+  return {
+    visitor: {
+      // --- All Function Types ---
+      FunctionDeclaration(path) { instrumentFunction(path); },
+      ArrowFunctionExpression(path) { instrumentFunction(path); },
+      FunctionExpression(path) { instrumentFunction(path); },
+      ClassMethod(path) { instrumentFunction(path); },
+      ObjectMethod(path) { instrumentFunction(path); },
+
+      IfStatement(path) {
+        // First, log the test condition itself so we can see the result.
+        const testLog = makeLog(path.get('test'), "test", [
+          t.objectProperty(
+            t.identifier("expression"),
+            t.stringLiteral(generate(path.node.test).code)
+          ),
+          t.objectProperty(t.identifier("result"), t.cloneNode(path.node.test)),
+        ]);
+        path.insertBefore(testLog);
+
+        // CRITICAL FIX: Ensure the 'if' and 'else' branches are blocks.
+        // This provides the correct scope for logs inside them.
+        if (!t.isBlockStatement(path.node.consequent)) {
+          path.node.consequent = t.blockStatement([path.node.consequent]);
+        }
+        if (path.node.alternate && !t.isBlockStatement(path.node.alternate)) {
+          path.node.alternate = t.blockStatement([path.node.alternate]);
+        }
+      },
+
+      // --- Variable Declarations ---
+      VariableDeclaration(path) {
+        if (
+          (t.isForStatement(path.parent) && path.key === "init") ||
+          (t.isForInStatement(path.parent) && path.key === "left") ||
+          (t.isForOfStatement(path.parent) && path.key === "left")
+        ) {
+          return;
+        }
+
+        path.get("declarations").forEach((declPath) => {
+          const decl = declPath.node;
+          const identifiers = Object.keys(declPath.get("id").getBindingIdentifiers());
+
+          identifiers.forEach(idName => {
+            const logNode = makeLog(declPath, "declare", [
+              t.objectProperty(
+                t.identifier("locals"),
+                t.objectExpression([
+                  t.objectProperty(
+                    t.identifier(idName),
+                    t.callExpression(t.identifier("__clone"), [
+                      decl.init ? t.cloneNode(decl.init) : t.identifier("undefined")
+                    ])
+                  ),
+                ])
+              ),
+            ]);
+            path.getStatementParent().insertAfter(logNode);
+          });
+        });
+      },
+
+      // --- Assignments & Updates ---
+      AssignmentExpression(path) {
+        if (t.isForStatement(path.parent) && (path.key === "init" || path.key === "update")) {
+          return;
+        }
+
+        let targetKey, valueToLog;
+
+        if (t.isIdentifier(path.node.left)) {
+          // Simple case: x = value
+          targetKey = path.node.left;
+          valueToLog = path.node.right;
+        } else if (t.isMemberExpression(path.node.left)) {
+          const object = path.node.left.object;
+
+          // CRITICAL FIX: Handle `this` keyword correctly.
+          if (t.isThisExpression(object)) {
+            targetKey = t.identifier("this"); // Use an Identifier named "this" as the key.
+            valueToLog = object; // The value is the `this` object itself.
+          } else {
+            // Member case: arr[j] = value
+            targetKey = object;
+            valueToLog = object;
+          }
+        } else {
+          // Fallback for other cases like destructuring
+          targetKey = t.stringLiteral(generate(path.node.left).code);
+          valueToLog = path.node.right;
+        }
+
+        const logNode = makeLog(path, "assign", [
+          t.objectProperty(
+            t.identifier("locals"),
+            t.objectExpression([
+              t.objectProperty(
+                targetKey,
+                t.callExpression(t.identifier("__clone"), [t.cloneNode(valueToLog)])
+              )
+            ])
+          )
+        ]);
+        path.getStatementParent().insertAfter(logNode);
+      },
+
+      UpdateExpression(path) {
+        if (t.isForStatement(path.parent) && path.key === "update") {
+          return;
+        }
+        const logNode = makeLog(path, "assign", [
+          t.objectProperty(
+            t.identifier("locals"),
+            t.objectExpression([
+              t.objectProperty(
+                path.node.argument,
+                t.callExpression(t.identifier("__clone"), [t.cloneNode(path.node.argument)])
+              )
+            ])
+          )
+        ]);
+        path.getStatementParent().insertAfter(logNode);
+      },
+
+      // --- Smart ForStatement Visitor ---
+      ForStatement(path) {
+        if (!t.isBlockStatement(path.node.body)) {
+          path.node.body = t.blockStatement([path.node.body]);
+        }
+        const bodyPath = path.get("body");
+
+        // FIX #2: Handle 'update' by moving it into the body to log the new value correctly.
+        if (path.node.update) {
+          const updateStatement = t.expressionStatement(path.node.update);
+          bodyPath.pushContainer("body", updateStatement);
+
+          let updatedVar = t.isUpdateExpression(path.node.update)
+            ? path.node.update.argument
+            : path.node.update.left;
+
+          if (updatedVar) {
+            const assignLog = makeLog(path, "assign", [
+              t.objectProperty(
+                t.identifier("locals"),
+                t.objectExpression([
+                  t.objectProperty(
+                    updatedVar,
+                    t.callExpression(t.identifier("__clone"), [t.cloneNode(updatedVar)])
+                  )
+                ])
+              )
+            ]);
+            bodyPath.pushContainer("body", assignLog);
+          }
+
+          path.node.update = null; // Remove from header to prevent running twice
+        }
+
+        // Handle 'test' (at the top of the body)
+        if (path.node.test) {
+          const testLog = makeLog(path, "test", [
+            t.objectProperty(
+              t.identifier("expression"),
+              t.stringLiteral(generate(path.node.test).code)
+            ),
+            t.objectProperty(t.identifier("result"), t.cloneNode(path.node.test)),
+          ]);
+          bodyPath.unshiftContainer("body", testLog);
+        }
+
+        // Handle 'init' (before the loop)
+        if (path.node.init) {
+          let logNode;
+          if (t.isVariableDeclaration(path.node.init)) {
+            path.node.init.declarations.forEach(decl => {
+              logNode = makeLog(path, "declare", [
+                t.objectProperty(
+                  t.identifier("locals"),
+                  t.objectExpression([
+                    t.objectProperty(
+                      t.identifier(decl.id.name),
+                      t.callExpression(t.identifier("__clone"), [
+                        decl.init ? t.cloneNode(decl.init) : t.identifier("undefined")
+                      ])
+                    ),
+                  ])
+                ),
+              ]);
+              path.insertBefore(logNode);
+            });
+          } else {
+            logNode = makeLog(path, "init", [
+              t.objectProperty(
+                t.identifier("expression"),
+                t.stringLiteral(generate(path.node.init).code)
+              ),
+            ]);
+            path.insertBefore(logNode);
+          }
+        }
+      },
+
+      // Other loops remain simple
+      WhileStatement(path) {
+        if (!t.isBlockStatement(path.node.body)) {
+          path.node.body = t.blockStatement([path.node.body]);
+        }
+        path.get("body").unshiftContainer(
+          "body",
+          makeLog(path, "loop", [t.objectProperty(t.identifier("type"), t.stringLiteral("while"))])
+        );
+      },
+      ForOfStatement(path) {
+        if (!t.isBlockStatement(path.node.body)) {
+          path.node.body = t.blockStatement([path.node.body]);
+        }
+        path.get("body").unshiftContainer(
+          "body",
+          makeLog(path, "loop", [t.objectProperty(t.identifier("type"), t.stringLiteral("for-of"))])
+        );
+      },
+
+      // --- Return Statements ---
+      ReturnStatement(path) {
+        path.insertBefore(
+          makeLog(path, "return", [
+            t.objectProperty(
+              t.identifier("value"),
+              path.node.argument
+                ? t.callExpression(t.identifier("__clone"), [t.cloneNode(path.node.argument)])
+                : t.nullLiteral()
+            ),
+          ])
+        );
+      },
+
+      // --- Other Call Expressions ---
+      CallExpression(path) {
+        if (
+          t.isMemberExpression(path.node.callee) &&
+          t.isIdentifier(path.node.callee.object) &&
+          path.node.callee.object.name === "console" &&
+          t.isIdentifier(path.node.callee.property) &&
+          path.node.callee.property.name === "log"
+        ) {
+          path.insertBefore(
+            makeLog(path, "stdout", [
+              t.objectProperty(
+                t.identifier("output"),
+                path.node.arguments[0]
+                  ? t.callExpression(t.identifier("__clone"), [t.cloneNode(path.node.arguments[0])])
+                  : t.stringLiteral("")
+              ),
+            ])
+          );
+        } else if (t.isNewExpression(path.node)) {
+          path.insertBefore(
+            makeLog(path, "instantiate", [
+              t.objectProperty(t.identifier("class"), t.stringLiteral(path.node.callee.name || "AnonymousClass")),
+            ])
+          );
+        }
+      },
+
+      // --- Class Declarations ---
+      ClassDeclaration(path) {
+        const className = path.node.id?.name || "AnonymousClass";
+        path.insertBefore(
+          makeLog(path, "class", [t.objectProperty(t.identifier("class"), t.stringLiteral(className))])
+        );
+      },
+    },
+  };
+};
+
+
+linkedList added
+gemini
