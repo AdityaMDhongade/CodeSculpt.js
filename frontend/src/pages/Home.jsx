@@ -25,7 +25,7 @@ const Home = () => {
   };
 
   return (
-    <div style={{ padding: "1rem", maxWidth: "900px", margin: "auto" }}>
+    <div style={{ padding: "0.5rem", maxWidth: "900px", margin: "auto" }}>
       <h1 style={{ textAlign: "center", marginBottom: "1rem" }}>
         JavaScript Code Visualizer
       </h1>
