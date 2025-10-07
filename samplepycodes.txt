@@ -108,6 +108,8 @@ const processData = (data) => {
 
 console.log(processData([10, 50, 30])); // { first: 10, max: 50 }
 
+...............................................................................................
+
 // linkedList.js
 class Node {
   constructor(data) {

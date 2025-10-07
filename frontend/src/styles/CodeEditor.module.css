@@ -1,249 +1,48 @@
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code&display=swap');
+.editorContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* Ensures it fills the parent .code-editor-container */
+}
 
-body {
+.editorHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.25rem;
+  background-color: rgba(15, 23, 42, 0.7); /* Dark, slightly transparent */
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0; /* Prevents the header from shrinking */
+}
+
+.editorTitle {
+  font-size: 1rem;
+  font-weight: 500;
   margin: 0;
-  font-family: 'Fira Code', monospace;
-  background: linear-gradient(135deg, #e0f7fa 0%, #ffffff 70%);
-  color: #004d40;
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 2rem;
-  gap: 2rem; /* space between editor and visualizer */
-}
-
-/* Headings */
-h1, h2, h3 {
-  color: #00796b;
-  text-shadow: 0 0 4px #4db6ac, 0 0 8px #26a69a;
-  margin: 0.5rem 0;
-}
-
-/* Buttons */
-button {
-  background: linear-gradient(90deg, #26a69a 0%, #80cbc4 100%);
-  color: #fff;
-  border: none;
-  border-radius: 0.618rem;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-button:hover {
-  transform: scale(1.05);
-  box-shadow: 0 0 10px #26a69a;
-}
-
-/* Background drift effect */
-body::before {
-  content: "";
-  position: fixed;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle at 20% 20%, rgba(0, 150, 136,0.05), transparent 40%),
-              radial-gradient(circle at 80% 80%, rgba(0, 150, 136,0.03), transparent 30%);
-  animation: drift 120s linear infinite;
-  z-index: -1;
-}
-
-@keyframes drift {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* Layout */
-.home-container {
-  display: flex;
-  flex-direction: row;
-  gap: 2rem;
-  width: 100%;
-  max-width: 1200px;
-}
-
-.code-editor-container, .visualizer-container {
-  flex: 1;
-  min-width: 350px;
-}
-
-/* --- Code Editor --- */
-.editor {
-  background: #e0f2f1;
-  border: 1px solid #80cbc4;
-  border-radius: 0.618rem;
-  padding: 1rem;
-  color: #004d40;
-  font-family: monospace;
-  width: 100%;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-}
-
-.codeInput {
-  width: 100%;
-  min-height: 200px;
-  background: #b2dfdb;
-  color: #004d40;
-  border: 1px solid #80cbc4;
-  border-radius: 0.5rem;
-  padding: 0.5rem;
-  font-family: monospace;
-  resize: vertical;
+  color: var(--text-secondary);
 }
 
 .runButton {
-  margin-top: 0.5rem;
-  background: #26a69a;
-  color: #fff;
-  border: none;
-  border-radius: 0.5rem;
+  background: linear-gradient(145deg, #16a34a, #15803d); /* Green gradient */
+  color: var(--text-primary);
+  border: 1px solid #22c55e;
+  border-radius: 8px;
   padding: 0.5rem 1rem;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .runButton:hover {
-  background: #80cbc4;
-  transform: scale(1.03);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3), 0 0 15px rgba(34, 197, 94, 0.2);
 }
 
-.monaco-editor .lineHighlight {
-  background-color: rgba(255, 235, 59, 0.2) !important;
-}
-
-/* --- Visualizer --- */
-.visualizer {
-  font-family: 'Fira Code', monospace;
-  background: #e0f7fa;
-  color: #004d40;
-  padding: 1.618rem; /* golden ratio */
-  border-radius: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.618rem; /* golden ratio spacing */
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-}
-
-.visualizer h2 {
-  font-size: 1.618rem;
-  font-weight: 700;
-  color: #00796b;
-}
-
-.stack-frame {
-  padding: 1rem 1.618rem;
-  border-radius: 1rem;
-  border: 1px solid #80cbc4;
-  background: #b2dfdb;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-
-.stack-frame strong {
-  font-size: 1.2rem;
-  color: #004d40;
-}
-
-.locals {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.618rem;
-  margin-top: 0.618rem;
-}
-
-.local-var {
-  padding: 0.4rem 0.8rem;
-  border-radius: 0.618rem;
-  background: #80deea;
-  color: #004d40;
-  min-width: 50px;
-  text-align: center;
-  font-size: 0.95rem;
-  transition: all 0.3s ease;
-}
-
-.local-var.updated {
-  background-color: #4dd0e1;
-}
-
-.return-value {
-  margin-top: 0.618rem;
-  font-style: italic;
-  color: #00796b;
-  font-size: 0.95rem;
-}
-
-.stdout {
-  margin-top: 1.618rem;
-  padding: 1rem;
-  background: #b2dfdb;
-  border-radius: 1rem;
-  max-height: 220px;
-  overflow-y: auto;
-}
-
-.stdout div {
-  font-family: 'Fira Code', monospace;
-  font-size: 0.95rem;
-  color: #004d40;
-}
-
-.controls {
-  margin-top: 1.618rem;
-  display: flex;
-  gap: 0.618rem;
-  justify-content: center;
-  align-items: center;
-}
-
-.controls button {
-  padding: 0.618rem 1rem;
-  border-radius: 1rem;
-  border: none;
-  background-color: #26a69a;
-  color: white;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: all 0.2s ease;
-}
-
-.controls button:hover {
-  background-color: #80cbc4;
-}
-
-.controls input[type="range"] {
-  width: 200px;
-  accent-color: #00796b;
-  cursor: pointer;
-}
-
-/* Responsive for laptops */
-@media (max-width: 1366px) {
-  .visualizer, .editor {
-    padding: 1.2rem;
-  }
-
-  .stack-frame {
-    padding: 0.75rem 1rem;
-  }
-
-  .local-var {
-    min-width: 40px;
-    font-size: 0.85rem;
-  }
-
-  .controls button {
-    padding: 0.5rem 0.8rem;
-    font-size: 0.9rem;
-  }
-}
-
-@media (max-width: 1024px) {
-  .visualizer {
-    min-height: 70vh;
-    padding: 1rem;
-  }
+.editorWrapper {
+  flex-grow: 1; /* Makes the editor take all available space */
+  min-height: 0; /* Critical for flexbox to not overflow its container */
 }
