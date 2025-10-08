@@ -39,7 +39,6 @@ function instrumentFunction(path) {
     );
   });
 
-  // Ensure body is a block statement
   if (!t.isBlockStatement(path.node.body)) {
     path.node.body = t.blockStatement([t.returnStatement(path.node.body)]);
   }
@@ -49,13 +48,6 @@ function instrumentFunction(path) {
     makeLog(path, "call", [
       t.objectProperty(t.identifier("function"), t.stringLiteral(fnName)),
       t.objectProperty(t.identifier("args"), t.objectExpression(params)),
-    ])
-  );
-
-  path.get("body").pushContainer(
-    "body",
-    makeLog(path, "return", [
-      t.objectProperty(t.identifier("function"), t.stringLiteral(fnName)),
     ])
   );
 
@@ -75,7 +67,6 @@ module.exports = function tracerPlugin() {
       ObjectMethod(path) { instrumentFunction(path); },
 
       IfStatement(path) {
-        // First, log the test condition itself so we can see the result.
         const testLog = makeLog(path.get('test'), "test", [
           t.objectProperty(
             t.identifier("expression"),
@@ -85,8 +76,6 @@ module.exports = function tracerPlugin() {
         ]);
         path.insertBefore(testLog);
 
-        // CRITICAL FIX: Ensure the 'if' and 'else' branches are blocks.
-        // This provides the correct scope for logs inside them.
         if (!t.isBlockStatement(path.node.consequent)) {
           path.node.consequent = t.blockStatement([path.node.consequent]);
         }
@@ -95,7 +84,8 @@ module.exports = function tracerPlugin() {
         }
       },
 
-      // --- Variable Declarations ---
+      // --- Variable Declarations & Assignments (Existing Logic) ---
+      // (This logic is complex but assumed correct and remains unchanged)
       VariableDeclaration(path) {
         if (
           (t.isForStatement(path.parent) && path.key === "init") ||
@@ -104,11 +94,9 @@ module.exports = function tracerPlugin() {
         ) {
           return;
         }
-
         path.get("declarations").forEach((declPath) => {
           const decl = declPath.node;
           const identifiers = Object.keys(declPath.get("id").getBindingIdentifiers());
-
           identifiers.forEach(idName => {
             const logNode = makeLog(declPath, "declare", [
               t.objectProperty(
@@ -127,27 +115,30 @@ module.exports = function tracerPlugin() {
           });
         });
       },
-
-      // --- Assignments & Updates ---
       AssignmentExpression(path) {
         if (t.isForStatement(path.parent) && (path.key === "init" || path.key === "update")) {
           return;
         }
 
-        let target, valueToLog;
+        const isCompound = path.node.operator !== "=";
+
+        let targetKey, valueToLog;
 
         if (t.isIdentifier(path.node.left)) {
-          // Simple case: x = value -> Log { x: value }
-          target = path.node.left;
-          valueToLog = path.node.right;
+          targetKey = path.node.left;
+          valueToLog = isCompound ? path.node.left : path.node.right;
         } else if (t.isMemberExpression(path.node.left)) {
-          // Member case: arr[j] = value -> Log { arr: arr }
-          target = path.node.left.object;
-          valueToLog = path.node.left.object;
+          const object = path.node.left.object;
+          if (t.isThisExpression(object)) {
+            targetKey = t.identifier("this");
+            valueToLog = isCompound ? path.node.left : object;
+          } else {
+            targetKey = object;
+            valueToLog = isCompound ? path.node.left : object;
+          }
         } else {
-          // Fallback for other cases like destructuring
-          target = t.stringLiteral(generate(path.node.left).code);
-          valueToLog = path.node.right;
+          targetKey = t.stringLiteral(generate(path.node.left).code);
+          valueToLog = isCompound ? path.node.left : path.node.right;
         }
 
         const logNode = makeLog(path, "assign", [
@@ -155,15 +146,15 @@ module.exports = function tracerPlugin() {
             t.identifier("locals"),
             t.objectExpression([
               t.objectProperty(
-                target,
+                targetKey,
                 t.callExpression(t.identifier("__clone"), [t.cloneNode(valueToLog)])
               )
             ])
           )
         ]);
+
         path.getStatementParent().insertAfter(logNode);
       },
-
       UpdateExpression(path) {
         if (t.isForStatement(path.parent) && path.key === "update") {
           return;
@@ -182,22 +173,19 @@ module.exports = function tracerPlugin() {
         path.getStatementParent().insertAfter(logNode);
       },
 
-      // --- Smart ForStatement Visitor ---
+      // --- Loops and Return (Existing Logic) ---
+      // (This logic is complex but assumed correct and remains unchanged)
       ForStatement(path) {
         if (!t.isBlockStatement(path.node.body)) {
           path.node.body = t.blockStatement([path.node.body]);
         }
         const bodyPath = path.get("body");
-
-        // FIX #2: Handle 'update' by moving it into the body to log the new value correctly.
         if (path.node.update) {
           const updateStatement = t.expressionStatement(path.node.update);
           bodyPath.pushContainer("body", updateStatement);
-
           let updatedVar = t.isUpdateExpression(path.node.update)
             ? path.node.update.argument
             : path.node.update.left;
-
           if (updatedVar) {
             const assignLog = makeLog(path, "assign", [
               t.objectProperty(
@@ -212,11 +200,8 @@ module.exports = function tracerPlugin() {
             ]);
             bodyPath.pushContainer("body", assignLog);
           }
-
-          path.node.update = null; // Remove from header to prevent running twice
+          path.node.update = null;
         }
-
-        // Handle 'test' (at the top of the body)
         if (path.node.test) {
           const testLog = makeLog(path, "test", [
             t.objectProperty(
@@ -227,8 +212,6 @@ module.exports = function tracerPlugin() {
           ]);
           bodyPath.unshiftContainer("body", testLog);
         }
-
-        // Handle 'init' (before the loop)
         if (path.node.init) {
           let logNode;
           if (t.isVariableDeclaration(path.node.init)) {
@@ -259,8 +242,6 @@ module.exports = function tracerPlugin() {
           }
         }
       },
-
-      // Other loops remain simple
       WhileStatement(path) {
         if (!t.isBlockStatement(path.node.body)) {
           path.node.body = t.blockStatement([path.node.body]);
@@ -279,8 +260,6 @@ module.exports = function tracerPlugin() {
           makeLog(path, "loop", [t.objectProperty(t.identifier("type"), t.stringLiteral("for-of"))])
         );
       },
-
-      // --- Return Statements ---
       ReturnStatement(path) {
         path.insertBefore(
           makeLog(path, "return", [
@@ -294,35 +273,37 @@ module.exports = function tracerPlugin() {
         );
       },
 
-      // --- Other Call Expressions ---
+      // --- Call Expressions ---
       CallExpression(path) {
+        // --- THIS IS THE FIX ---
+        // Check if this is a console.log call
         if (
           t.isMemberExpression(path.node.callee) &&
-          t.isIdentifier(path.node.callee.object) &&
-          path.node.callee.object.name === "console" &&
-          t.isIdentifier(path.node.callee.property) &&
-          path.node.callee.property.name === "log"
+          t.isIdentifier(path.node.callee.object, { name: "console" }) &&
+          t.isIdentifier(path.node.callee.property, { name: "log" })
         ) {
-          path.insertBefore(
-            makeLog(path, "stdout", [
-              t.objectProperty(
-                t.identifier("output"),
-                path.node.arguments[0]
-                  ? t.callExpression(t.identifier("__clone"), [t.cloneNode(path.node.arguments[0])])
-                  : t.stringLiteral("")
-              ),
-            ])
-          );
-        } else if (t.isNewExpression(path.node)) {
-          path.insertBefore(
-            makeLog(path, "instantiate", [
-              t.objectProperty(t.identifier("class"), t.stringLiteral(path.node.callee.name || "AnonymousClass")),
-            ])
-          );
+          // 1. Create an array of all arguments: [arg1, arg2, ...]
+          const argsArray = t.arrayExpression(path.node.arguments);
+
+          // 2. Create an AST node for the join method: `[...].join`
+          const joinMember = t.memberExpression(argsArray, t.identifier("join"));
+
+          // 3. Create the call to join: `[...].join(' ')`
+          const joinCall = t.callExpression(joinMember, [t.stringLiteral(" ")]);
+
+          // 4. Create the final __log call using the joined string as the output
+          const logNode = makeLog(path, "stdout", [
+            t.objectProperty(
+              t.identifier("output"),
+              joinCall // The result of the join call is our output
+            ),
+          ]);
+
+          // 5. Replace the original console.log with our tracer call
+          path.replaceWith(logNode);
         }
       },
 
-      // --- Class Declarations ---
       ClassDeclaration(path) {
         const className = path.node.id?.name || "AnonymousClass";
         path.insertBefore(
@@ -332,7 +313,3 @@ module.exports = function tracerPlugin() {
     },
   };
 };
-
-
-for working
-gemini

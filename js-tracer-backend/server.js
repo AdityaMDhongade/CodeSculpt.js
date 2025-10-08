@@ -10,41 +10,6 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// --- HELPER FUNCTION 1: SELECT THE CORRECT EXECUTION RUN ---
-/**
- * Analyzes raw logs to select the most relevant execution run for visualization.
- *
- * @param {Array<Object>} rawLogs - The complete, unfiltered log from the backend.
- * @returns {Array<Object>} A slice of the logs representing the single, correct run to visualize.
- */
-function selectExecutionRun(rawLogs) {
-  if (!rawLogs || rawLogs.length === 0) {
-    return [];
-  }
-
-  // Find the starting index of every function call.
-  const callIndices = [];
-  rawLogs.forEach((log, index) => {
-    if (log.action === 'call') {
-      callIndices.push(index);
-    }
-  });
-
-  // Decide which run to use.
-  if (callIndices.length === 0) {
-    // SCENARIO: No 'call' actions found (e.g., just a function definition).
-    // Visualize the entire log as a "dry run".
-    console.log("No function calls detected. Visualizing the definition.");
-    return rawLogs;
-  } else {
-    // SCENARIO: One or more 'call' actions were found.
-    // We only want the LAST execution run.
-    const lastCallIndex = callIndices[callIndices.length - 1];
-    console.log(`Multiple runs detected. Selecting the last run starting at index ${lastCallIndex}.`);
-    return rawLogs.slice(lastCallIndex);
-  }
-}
-
 // --- HELPER FUNCTION 2: FILTER AND CLEAN THE FRAMES ---
 /**
  * Processes a single execution run into a clean, de-duplicated, and context-rich
@@ -138,16 +103,14 @@ app.post("/api/code/run", (req, res) => {
     vm.runInContext(wrappedCode, sandbox);
     const rawLogs = sandbox.module.exports;
 
-    // 4. Run the logs through our two-step processing pipeline
-    const executionRun = selectExecutionRun(rawLogs);
-    finalFrames = filterLogs(executionRun);
+    finalFrames = filterLogs(rawLogs); // For now, just show everything
 
   } catch (err) {
     // If anything goes wrong, send an error frame
     finalFrames = [{ error: err.message, locals: {} }];
   }
 
-  console.log("Sending Final Frames to Client:", finalFrames.length);
+  console.log("Sending Final Frames to Client:", finalFrames);
   res.json({ logs: finalFrames });
 });
 
