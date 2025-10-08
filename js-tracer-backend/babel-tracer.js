@@ -75,7 +75,7 @@ module.exports = function tracerPlugin() {
           t.objectProperty(t.identifier("result"), t.cloneNode(path.node.test)),
         ]);
         path.insertBefore(testLog);
-        
+
         if (!t.isBlockStatement(path.node.consequent)) {
           path.node.consequent = t.blockStatement([path.node.consequent]);
         }
@@ -119,23 +119,28 @@ module.exports = function tracerPlugin() {
         if (t.isForStatement(path.parent) && (path.key === "init" || path.key === "update")) {
           return;
         }
+
+        const isCompound = path.node.operator !== "=";
+
         let targetKey, valueToLog;
+
         if (t.isIdentifier(path.node.left)) {
           targetKey = path.node.left;
-          valueToLog = path.node.right;
+          valueToLog = isCompound ? path.node.left : path.node.right;
         } else if (t.isMemberExpression(path.node.left)) {
           const object = path.node.left.object;
           if (t.isThisExpression(object)) {
             targetKey = t.identifier("this");
-            valueToLog = object;
+            valueToLog = isCompound ? path.node.left : object;
           } else {
             targetKey = object;
-            valueToLog = object;
+            valueToLog = isCompound ? path.node.left : object;
           }
         } else {
           targetKey = t.stringLiteral(generate(path.node.left).code);
-          valueToLog = path.node.right;
+          valueToLog = isCompound ? path.node.left : path.node.right;
         }
+
         const logNode = makeLog(path, "assign", [
           t.objectProperty(
             t.identifier("locals"),
@@ -147,6 +152,7 @@ module.exports = function tracerPlugin() {
             ])
           )
         ]);
+
         path.getStatementParent().insertAfter(logNode);
       },
       UpdateExpression(path) {
@@ -236,8 +242,24 @@ module.exports = function tracerPlugin() {
           }
         }
       },
-      WhileStatement(path) { /* ... unchanged ... */ },
-      ForOfStatement(path) { /* ... unchanged ... */ },
+      WhileStatement(path) {
+        if (!t.isBlockStatement(path.node.body)) {
+          path.node.body = t.blockStatement([path.node.body]);
+        }
+        path.get("body").unshiftContainer(
+          "body",
+          makeLog(path, "loop", [t.objectProperty(t.identifier("type"), t.stringLiteral("while"))])
+        );
+      },
+      ForOfStatement(path) {
+        if (!t.isBlockStatement(path.node.body)) {
+          path.node.body = t.blockStatement([path.node.body]);
+        }
+        path.get("body").unshiftContainer(
+          "body",
+          makeLog(path, "loop", [t.objectProperty(t.identifier("type"), t.stringLiteral("for-of"))])
+        );
+      },
       ReturnStatement(path) {
         path.insertBefore(
           makeLog(path, "return", [
@@ -265,7 +287,7 @@ module.exports = function tracerPlugin() {
 
           // 2. Create an AST node for the join method: `[...].join`
           const joinMember = t.memberExpression(argsArray, t.identifier("join"));
-          
+
           // 3. Create the call to join: `[...].join(' ')`
           const joinCall = t.callExpression(joinMember, [t.stringLiteral(" ")]);
 
@@ -276,13 +298,18 @@ module.exports = function tracerPlugin() {
               joinCall // The result of the join call is our output
             ),
           ]);
-          
+
           // 5. Replace the original console.log with our tracer call
           path.replaceWith(logNode);
         }
       },
 
-      ClassDeclaration(path) { /* ... unchanged ... */ },
+      ClassDeclaration(path) {
+        const className = path.node.id?.name || "AnonymousClass";
+        path.insertBefore(
+          makeLog(path, "class", [t.objectProperty(t.identifier("class"), t.stringLiteral(className))])
+        );
+      },
     },
   };
 };

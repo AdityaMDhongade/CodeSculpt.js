@@ -262,3 +262,55 @@
   max-height: 150px; /* Make it scrollable if there's a lot of output */
   overflow-y: auto;
 }
+
+/* --- Add these new styles to the bottom of your Visualizer.module.css --- */
+/* This is the box that contains the linked list visualization */
+.datastructureView {
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  background: rgba(0,0,0,0.2);
+  border-radius: 8px;
+  width: 100%;
+  overflow-x: auto; /* Allows scrolling for very long linked lists */
+}
+
+/* --- Linked List Specific Styles --- */
+.linkedListContainer {
+  display: flex;
+  align-items: center;
+  padding: 0.25rem; /* Small padding so nodes don't touch the edge */
+}
+
+.llNode, .llNull {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  background: #475569;
+  border: 1px solid #64748b;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-family: monospace;
+  text-align: center;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+  white-space: nowrap; /* Prevents text from wrapping inside a node */
+}
+
+.llNull {
+  background: #7f1d1d; /* A reddish color for null */
+  border-color: #b91c1c;
+  font-size: 0.9rem;
+}
+
+.llArrow {
+  color: #94a3b8; /* Gray for the arrow */
+  margin: 0 0.5rem;
+  flex-shrink: 0; /* Prevents arrow from shrinking */
+}
+
+/* --- Add this ONE new class to Visualizer.module.css --- */
+
+/* This container is used for a linked list variable to make it span the full width */
+.linkedListVariableContainer {
+  /* This tells the grid item to span all columns */
+  grid-column: 1 / -1; 
+  width: 100%;
+}
